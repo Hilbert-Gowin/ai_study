@@ -26,6 +26,8 @@ spring:
       chat:
         options:
           model: glm-4-flash-250414
+      embedding:
+        model: embedding-2
 
 management:
   endpoints:

@@ -63,14 +63,6 @@
             <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
         </dependency>
 
-        <!-- Spring AI Transformers - 本地 Embedding (Spring AI 1.1.x 已移除此依赖，如需本地Embedding请使用 spring-ai-onnx embeddings) -->
-        <!--
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-transformers-spring-boot-starter</artifactId>
-        </dependency>
-        -->
-
         <!-- Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
