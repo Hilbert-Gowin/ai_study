@@ -1,0 +1,32 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+
+# Build
+target/
+*.class
+*.jar
+*.war
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.bak
+*.orig
+
+# Environment
+.env
+.env.local

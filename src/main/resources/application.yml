@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: ai-study
+
+  # 模型提供商选择: dashscope / openai
+  # 通过环境变量 SPRING_AI_MODEL 切换
+  ai:
+    model: ${SPRING_AI_MODEL:openai}
+
+    # 阿里云百炼配置
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
+      chat:
+        options:
+          model: qwen-max
+
+    # OpenAI 配置
+    openai:
+      api-key: ${OPENAI_API_KEY:your-openai-api-key}
+      base-url: ${OPENAI_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+      chat:
+        options:
+          model: glm-4-flash-250414
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
