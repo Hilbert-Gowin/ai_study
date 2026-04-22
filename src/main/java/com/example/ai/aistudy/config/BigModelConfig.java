@@ -23,6 +23,7 @@ import org.springframework.web.client.RestClient;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +41,9 @@ public class BigModelConfig {
 
     @Value("${spring.ai.openai.embedding.model:embedding-2}")
     private String embeddingModel;
+
+    @Value("${spring.ai.openai.embedding.type:local}")
+    private String embeddingType;
 
     @Bean
     @Primary
@@ -238,7 +242,7 @@ public class BigModelConfig {
 
         @Override
         public int dimensions() {
-            return 1024; // 智谱 embedding-2 模型维度
+            return 1024;
         }
 
         @Override
@@ -286,9 +290,194 @@ public class BigModelConfig {
         }
     }
 
+    /**
+     * 本地模拟 Embedding 模型 - 用于本地测试
+     *
+     * 工作原理：
+     * 1. 预先为常见词汇分配随机向量
+     * 2. 计算文本向量时，对文本中的词向量取平均
+     * 3. 搜索时计算余弦相似度
+     */
+    public static class InMemoryEmbeddingModel implements EmbeddingModel {
+        private static final int DIMENSIONS = 1024;
+        private final Map<String, float[]> vocabulary = new HashMap<>();
+
+        public InMemoryEmbeddingModel() {
+            initVocabulary();
+        }
+
+        private void initVocabulary() {
+            // AI 相关词汇
+            addWord("AI", 0.8f, 0.6f, 0.9f);
+            addWord("人工智能", 0.8f, 0.6f, 0.9f);
+            addWord("框架", 0.6f, 0.4f, 0.5f);
+            addWord("Spring", 0.5f, 0.3f, 0.4f);
+            addWord("应用", 0.5f, 0.4f, 0.5f);
+
+            // RAG 相关词汇
+            addWord("RAG", 0.9f, 0.8f, 0.7f);
+            addWord("检索", 0.7f, 0.8f, 0.6f);
+            addWord("增强", 0.6f, 0.7f, 0.5f);
+            addWord("生成", 0.5f, 0.6f, 0.7f);
+            addWord("检索增强生成", 0.85f, 0.75f, 0.65f);
+
+            // Embedding 相关词汇
+            addWord("Embedding", 0.9f, 0.7f, 0.8f);
+            addWord("向量化", 0.8f, 0.7f, 0.8f);
+            addWord("文本", 0.5f, 0.5f, 0.5f);
+            addWord("向量", 0.7f, 0.6f, 0.7f);
+            addWord("语义", 0.6f, 0.8f, 0.6f);
+            addWord("相似度", 0.6f, 0.7f, 0.7f);
+
+            // 向量数据库
+            addWord("向量库", 0.7f, 0.6f, 0.7f);
+            addWord("存储", 0.4f, 0.5f, 0.5f);
+            addWord("Milvus", 0.3f, 0.4f, 0.3f);
+            addWord("Chroma", 0.3f, 0.4f, 0.3f);
+
+            // LLM 相关
+            addWord("LLM", 0.8f, 0.7f, 0.8f);
+            addWord("大模型", 0.8f, 0.7f, 0.8f);
+            addWord("语言模型", 0.7f, 0.6f, 0.7f);
+            addWord("智谱", 0.5f, 0.4f, 0.5f);
+            addWord("GLM", 0.5f, 0.4f, 0.5f);
+            addWord("GPT", 0.6f, 0.5f, 0.6f);
+
+            // 通用词汇
+            addWord("是", 0.1f, 0.1f, 0.1f);
+            addWord("一个", 0.1f, 0.1f, 0.1f);
+            addWord("用于", 0.2f, 0.2f, 0.2f);
+            addWord("的", 0.05f, 0.05f, 0.05f);
+            addWord("技术", 0.4f, 0.5f, 0.4f);
+            addWord("方法", 0.3f, 0.4f, 0.3f);
+            addWord("系统", 0.4f, 0.3f, 0.4f);
+            addWord("学习", 0.3f, 0.4f, 0.3f);
+        }
+
+        private void addWord(String word, float v1, float v2, float v3) {
+            float[] vec = new float[DIMENSIONS];
+            vec[0] = v1;
+            vec[1] = v2;
+            vec[2] = v3;
+            for (int i = 3; i < DIMENSIONS; i++) {
+                vec[i] = (float) (Math.random() * 0.1);
+            }
+            vocabulary.put(word, vec);
+        }
+
+        @Override
+        public float[] embed(String text) {
+            return embedText(text);
+        }
+
+        @Override
+        public float[] embed(Document document) {
+            return embed(document.getText());
+        }
+
+        @Override
+        public List<float[]> embed(List<String> texts) {
+            return texts.stream().map(this::embed).toList();
+        }
+
+        @Override
+        public List<float[]> embed(List<Document> documents,
+                                    EmbeddingOptions options,
+                                    BatchingStrategy batchingStrategy) {
+            return documents.stream().map(this::embed).toList();
+        }
+
+        @Override
+        public EmbeddingResponse embedForResponse(List<String> texts) {
+            List<float[]> embeddings = embed(texts);
+            List<Embedding> results = new ArrayList<>();
+            for (int i = 0; i < embeddings.size(); i++) {
+                results.add(new Embedding(embeddings.get(i), i));
+            }
+            return new EmbeddingResponse(results, new EmbeddingResponseMetadata());
+        }
+
+        @Override
+        public int dimensions() {
+            return DIMENSIONS;
+        }
+
+        @Override
+        public EmbeddingResponse call(EmbeddingRequest request) {
+            List<String> texts = request.getInstructions();
+            List<float[]> embeddings = embed(texts);
+            List<Embedding> results = new ArrayList<>();
+            for (int i = 0; i < embeddings.size(); i++) {
+                results.add(new Embedding(embeddings.get(i), i));
+            }
+            return new EmbeddingResponse(results, new EmbeddingResponseMetadata());
+        }
+
+        private float[] embedText(String text) {
+            float[] result = new float[DIMENSIONS];
+            int count = 0;
+
+            String[] words = text.split("\\s");
+
+            for (String word : words) {
+                if (word.isEmpty()) continue;
+
+                float[] wordVec = findBestMatch(word);
+                if (wordVec != null) {
+                    for (int i = 0; i < DIMENSIONS; i++) {
+                        result[i] += wordVec[i];
+                    }
+                    count++;
+                }
+            }
+
+            if (count > 0) {
+                for (int i = 0; i < DIMENSIONS; i++) {
+                    result[i] /= count;
+                }
+            }
+
+            return result;
+        }
+
+        private float[] findBestMatch(String word) {
+            if (vocabulary.containsKey(word)) {
+                return vocabulary.get(word);
+            }
+
+            for (Map.Entry<String, float[]> entry : vocabulary.entrySet()) {
+                if (word.contains(entry.getKey()) || entry.getKey().contains(word)) {
+                    return entry.getValue();
+                }
+            }
+
+            float[] random = new float[DIMENSIONS];
+            for (int i = 0; i < DIMENSIONS; i++) {
+                random[i] = (float) (Math.random() * 0.2);
+            }
+            return random;
+        }
+
+        public static float cosineSimilarity(float[] a, float[] b) {
+            float dotProduct = 0;
+            float normA = 0;
+            float normB = 0;
+            for (int i = 0; i < a.length; i++) {
+                dotProduct += a[i] * b[i];
+                normA += a[i] * a[i];
+                normB += b[i] * b[i];
+            }
+            if (normA == 0 || normB == 0) return 0;
+            return dotProduct / (float) (Math.sqrt(normA) * Math.sqrt(normB));
+        }
+    }
+
     @Bean
     public EmbeddingModel embeddingModel() {
-        return new ZhipuEmbeddingModel(apiKey, baseUrl, embeddingModel);
+        if ("zhipu".equalsIgnoreCase(embeddingType)) {
+            return new ZhipuEmbeddingModel(apiKey, baseUrl, embeddingModel);
+        }
+        return new InMemoryEmbeddingModel();
     }
 
     @Bean

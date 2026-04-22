@@ -28,6 +28,8 @@ spring:
           model: glm-4-flash-250414
       embedding:
         model: embedding-2
+        # embedding 实现类型: local=本地模拟, zhipu=智谱API
+        type: ${SPRING_AI_EMBEDDING_TYPE:local}
 
 management:
   endpoints:
