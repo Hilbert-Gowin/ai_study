@@ -1,7 +1,6 @@
 package com.example.ai.aistudy.controller;
 
 import com.example.ai.aistudy.service.RagService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,10 +9,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/rag")
-@RequiredArgsConstructor
 public class RagController {
 
     private final RagService ragService;
+
+    public RagController(RagService ragService) {
+        this.ragService = ragService;
+    }
 
     /**
      * 添加文档

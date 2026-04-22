@@ -2,7 +2,6 @@ package com.example.ai.aistudy.controller;
 
 import com.example.ai.aistudy.model.Conversation;
 import com.example.ai.aistudy.service.ChatService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -11,10 +10,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/chat")
-@RequiredArgsConstructor
 public class ChatController {
 
     private final ChatService chatService;
+
+    public ChatController(ChatService chatService) {
+        this.chatService = chatService;
+    }
 
     /**
      * 简单对话 - 流式

@@ -10,11 +10,15 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class RagService {
 
     private final VectorStore vectorStore;
-    private final ChatClient.Builder chatClientBuilder;
+    private final ChatClient chatClient;
+
+    public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder) {
+        this.vectorStore = vectorStore;
+        this.chatClient = chatClientBuilder.build();
+    }
 
     /**
      * 添加文档到向量存储
@@ -72,7 +76,7 @@ public class RagService {
                 %s
                 """.formatted(context, question);
 
-        return chatClientBuilder.build().prompt()
+        return chatClient.prompt()
                 .user(prompt)
                 .call()
                 .content();

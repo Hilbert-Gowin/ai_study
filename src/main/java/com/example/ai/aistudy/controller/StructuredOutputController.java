@@ -1,6 +1,5 @@
 package com.example.ai.aistudy.controller;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -9,10 +8,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/structured")
-@RequiredArgsConstructor
 public class StructuredOutputController {
 
-    private final ChatClient.Builder chatClientBuilder;
+    private final ChatClient chatClient;
+
+    public StructuredOutputController(ChatClient.Builder chatClientBuilder) {
+        this.chatClient = chatClientBuilder.build();
+    }
 
     /**
      * 结构化输出示例：提取人物信息
@@ -38,7 +40,7 @@ public class StructuredOutputController {
                 %s
                 """.formatted(text);
 
-        return chatClientBuilder.build().prompt()
+        return chatClient.prompt()
                 .user(prompt)
                 .call()
                 .entity(PersonInfo.class);
@@ -66,7 +68,7 @@ public class StructuredOutputController {
                 %s
                 """.formatted(text);
 
-        return chatClientBuilder.build().prompt()
+        return chatClient.prompt()
                 .user(prompt)
                 .call()
                 .entity(EntitiesResult.class);
