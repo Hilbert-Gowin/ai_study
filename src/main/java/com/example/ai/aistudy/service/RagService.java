@@ -1,8 +1,10 @@
 package com.example.ai.aistudy.service;
 
+import com.example.ai.aistudy.config.BigModelConfig.InMemoryEmbeddingModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
@@ -14,20 +16,62 @@ public class RagService {
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
+    private final EmbeddingModel embeddingModel;
 
-    public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder) {
+    public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder, EmbeddingModel embeddingModel) {
         this.vectorStore = vectorStore;
         this.chatClient = chatClientBuilder.build();
+        this.embeddingModel = embeddingModel;
     }
 
     /**
      * 添加文档到向量存储
      */
     public void addDocuments(List<String> texts) {
+        // 先打印每个文本的 embedding
+        for (int i = 0; i < texts.size(); i++) {
+            String text = texts.get(i);
+            float[] embedding = embeddingModel.embed(text);
+            System.out.println("=== 文档 " + (i + 1) + " ===");
+            System.out.println("内容: " + text);
+            System.out.println("Embedding 维度: " + embedding.length);
+            System.out.println("Embedding (前10维): " + toString(embedding));
+            System.out.println();
+        }
+
+        // 计算文档之间的相似度
+        if (texts.size() > 1) {
+            float[][] embeddings = new float[texts.size()][];
+            for (int i = 0; i < texts.size(); i++) {
+                embeddings[i] = embeddingModel.embed(texts.get(i));
+            }
+
+            System.out.println("=== 文档相似度矩阵 ===");
+            for (int i = 0; i < texts.size(); i++) {
+                for (int j = i + 1; j < texts.size(); j++) {
+                    float sim = InMemoryEmbeddingModel.cosineSimilarity(embeddings[i], embeddings[j]);
+                    System.out.printf("文档%d vs 文档%d 相似度: %.4f%n", i + 1, j + 1, sim);
+                }
+            }
+            System.out.println();
+        }
+
         List<Document> documents = texts.stream()
                 .map(Document::new)
                 .toList();
         vectorStore.add(documents);
+    }
+
+    private String toString(float[] arr) {
+        StringBuilder sb = new StringBuilder("[");
+        int limit = Math.min(10, arr.length);
+        for (int i = 0; i < limit; i++) {
+            sb.append(String.format("%.4f", arr[i]));
+            if (i < limit - 1) sb.append(", ");
+        }
+        if (arr.length > 10) sb.append(", ...");
+        sb.append("]");
+        return sb.toString();
     }
 
     /**

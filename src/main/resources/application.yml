@@ -14,10 +14,12 @@ spring:
 
     # 阿里云百炼配置
     dashscope:
-      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
+      api-key: ${AI_DASHSCOPE_API_KEY:your-dashscope-api-key}
       chat:
         options:
           model: qwen-max
+      embedding:
+        model: text-embedding-v1
 
     # OpenAI 配置
     openai:
@@ -28,8 +30,8 @@ spring:
           model: glm-4-flash-250414
       embedding:
         model: embedding-2
-        # embedding 实现类型: local=本地模拟, zhipu=智谱API
-        type: ${SPRING_AI_EMBEDDING_TYPE:local}
+        # embedding 实现类型: local=本地模拟, zhipu=智谱API，百练=dashscope
+        type: ${SPRING_AI_EMBEDDING_TYPE:dashscope}
 
 management:
   endpoints:

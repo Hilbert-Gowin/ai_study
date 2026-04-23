@@ -1,5 +1,7 @@
 package com.example.ai.aistudy.config;
 
+import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
+import com.alibaba.cloud.ai.dashscope.embedding.DashScopeEmbeddingModel;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -8,13 +10,13 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.embedding.BatchingStrategy;
-import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.embedding.EmbeddingOptions;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.embedding.EmbeddingResponseMetadata;
+import org.springframework.ai.embedding.BatchingStrategy;
+import org.springframework.ai.embedding.EmbeddingOptions;
+import org.springframework.ai.embedding.Embedding;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +46,12 @@ public class BigModelConfig {
 
     @Value("${spring.ai.openai.embedding.type:local}")
     private String embeddingType;
+
+    @Value("${spring.ai.dashscope.api-key:}")
+    private String dashscopeApiKey;
+
+    @Value("${spring.ai.dashscope.embedding.model:text-embedding-v1}")
+    private String dashscopeEmbeddingModel;
 
     @Bean
     @Primary
@@ -307,47 +315,84 @@ public class BigModelConfig {
         }
 
         private void initVocabulary() {
-            // AI 相关词汇
+            // ============ 技术/框架 ============
             addWord("AI", 0.8f, 0.6f, 0.9f);
             addWord("人工智能", 0.8f, 0.6f, 0.9f);
             addWord("框架", 0.6f, 0.4f, 0.5f);
             addWord("Spring", 0.5f, 0.3f, 0.4f);
+            addWord("SpringBoot", 0.55f, 0.35f, 0.45f);
+            addWord("Boot", 0.5f, 0.3f, 0.4f);
             addWord("应用", 0.5f, 0.4f, 0.5f);
 
-            // RAG 相关词汇
+            // ============ Java/编程语言 ============
+            addWord("Java", 0.9f, 0.8f, 0.7f);
+            addWord("编程", 0.7f, 0.6f, 0.6f);
+            addWord("语言", 0.6f, 0.5f, 0.5f);
+            addWord("代码", 0.5f, 0.5f, 0.5f);
+            addWord("程序员", 0.6f, 0.5f, 0.5f);
+            addWord("开发", 0.5f, 0.4f, 0.5f);
+            addWord("开发人员", 0.5f, 0.4f, 0.5f);
+
+            // ============ 数据库 ============
+            addWord("数据库", 0.85f, 0.75f, 0.65f);
+            addWord("DB", 0.8f, 0.7f, 0.6f);
+            addWord("MySQL", 0.9f, 0.8f, 0.7f);
+            addWord("SQL", 0.85f, 0.75f, 0.65f);
+            addWord("连接", 0.6f, 0.5f, 0.5f);
+            addWord("存储", 0.5f, 0.5f, 0.5f);
+            addWord("查询", 0.6f, 0.6f, 0.5f);
+            addWord("表", 0.5f, 0.5f, 0.4f);
+            addWord("数据", 0.7f, 0.6f, 0.6f);
+
+            // ============ RAG/检索增强 ============
             addWord("RAG", 0.9f, 0.8f, 0.7f);
             addWord("检索", 0.7f, 0.8f, 0.6f);
             addWord("增强", 0.6f, 0.7f, 0.5f);
             addWord("生成", 0.5f, 0.6f, 0.7f);
             addWord("检索增强生成", 0.85f, 0.75f, 0.65f);
 
-            // Embedding 相关词汇
+            // ============ Embedding/向量 ============
             addWord("Embedding", 0.9f, 0.7f, 0.8f);
             addWord("向量化", 0.8f, 0.7f, 0.8f);
             addWord("文本", 0.5f, 0.5f, 0.5f);
             addWord("向量", 0.7f, 0.6f, 0.7f);
             addWord("语义", 0.6f, 0.8f, 0.6f);
             addWord("相似度", 0.6f, 0.7f, 0.7f);
+            addWord("维度", 0.4f, 0.5f, 0.4f);
 
-            // 向量数据库
+            // ============ 向量数据库 ============
             addWord("向量库", 0.7f, 0.6f, 0.7f);
-            addWord("存储", 0.4f, 0.5f, 0.5f);
             addWord("Milvus", 0.3f, 0.4f, 0.3f);
             addWord("Chroma", 0.3f, 0.4f, 0.3f);
 
-            // LLM 相关
+            // ============ LLM/大模型 ============
             addWord("LLM", 0.8f, 0.7f, 0.8f);
             addWord("大模型", 0.8f, 0.7f, 0.8f);
             addWord("语言模型", 0.7f, 0.6f, 0.7f);
             addWord("智谱", 0.5f, 0.4f, 0.5f);
             addWord("GLM", 0.5f, 0.4f, 0.5f);
             addWord("GPT", 0.6f, 0.5f, 0.6f);
+            addWord("模型", 0.6f, 0.5f, 0.6f);
 
-            // 通用词汇
+            // ============ 天气/生活 ============
+            addWord("天气", 0.2f, 0.85f, 0.3f);
+            addWord("气候", 0.2f, 0.8f, 0.3f);
+            addWord("温度", 0.1f, 0.7f, 0.2f);
+            addWord("晴", 0.1f, 0.75f, 0.2f);
+            addWord("雨", 0.1f, 0.7f, 0.25f);
+            addWord("阴天", 0.1f, 0.8f, 0.2f);
+            addWord("今天", 0.3f, 0.5f, 0.4f);
+            addWord("查询", 0.6f, 0.6f, 0.5f);
+            addWord("怎么样", 0.2f, 0.4f, 0.3f);
+
+            // ============ 通用动词/虚词 ============
             addWord("是", 0.1f, 0.1f, 0.1f);
             addWord("一个", 0.1f, 0.1f, 0.1f);
             addWord("用于", 0.2f, 0.2f, 0.2f);
             addWord("的", 0.05f, 0.05f, 0.05f);
+            addWord("如何", 0.4f, 0.3f, 0.4f);
+            addWord("怎么", 0.3f, 0.3f, 0.3f);
+            addWord("操作", 0.5f, 0.4f, 0.5f);
             addWord("技术", 0.4f, 0.5f, 0.4f);
             addWord("方法", 0.3f, 0.4f, 0.3f);
             addWord("系统", 0.4f, 0.3f, 0.4f);
@@ -476,6 +521,14 @@ public class BigModelConfig {
     public EmbeddingModel embeddingModel() {
         if ("zhipu".equalsIgnoreCase(embeddingType)) {
             return new ZhipuEmbeddingModel(apiKey, baseUrl, embeddingModel);
+        } else if ("dashscope".equalsIgnoreCase(embeddingType)) {
+            DashScopeApi dashScopeApi =
+                DashScopeApi.builder()
+                    .apiKey(dashscopeApiKey)
+                    .build();
+            return DashScopeEmbeddingModel.builder()
+                    .dashScopeApi(dashScopeApi)
+                    .build();
         }
         return new InMemoryEmbeddingModel();
     }
