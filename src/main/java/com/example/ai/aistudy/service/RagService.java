@@ -1,7 +1,7 @@
 package com.example.ai.aistudy.service;
 
+import com.example.ai.aistudy.chunk.SimpleTextChunker;
 import com.example.ai.aistudy.config.BigModelConfig.InMemoryEmbeddingModel;
-import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -17,11 +17,13 @@ public class RagService {
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
     private final EmbeddingModel embeddingModel;
+    private final SimpleTextChunker textChunker;
 
-    public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder, EmbeddingModel embeddingModel) {
+    public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder, EmbeddingModel embeddingModel, SimpleTextChunker textChunker) {
         this.vectorStore = vectorStore;
         this.chatClient = chatClientBuilder.build();
         this.embeddingModel = embeddingModel;
+        this.textChunker = textChunker;
     }
 
     /**
@@ -56,9 +58,14 @@ public class RagService {
             System.out.println();
         }
 
-        List<Document> documents = texts.stream()
-                .map(Document::new)
-                .toList();
+        // 使用 chunking 策略切分文档
+        List<Document> documents = textChunker.chunkToDocuments(texts);
+        System.out.println("=== Chunking 结果 ===");
+        System.out.println("原始文档数: " + texts.size());
+        System.out.println("切分后 Chunk 数: " + documents.size());
+        System.out.println("Chunk 策略: " + textChunker.getDescription());
+        System.out.println();
+
         vectorStore.add(documents);
     }
 
