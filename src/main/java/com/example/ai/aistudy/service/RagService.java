@@ -89,6 +89,7 @@ public class RagService {
                 SearchRequest.builder()
                         .query(query)
                         .topK(topK)
+                        .similarityThreshold(0.5f)
                         .build()
         );
     }
@@ -102,6 +103,7 @@ public class RagService {
                 SearchRequest.builder()
                         .query(question)
                         .topK(3)
+                        .similarityThreshold(0.5f)
                         .build()
         );
 
