@@ -55,15 +55,32 @@ public class SimpleTextChunker {
      */
     public List<org.springframework.ai.document.Document> chunkToDocuments(List<String> texts) {
         List<org.springframework.ai.document.Document> documents = new ArrayList<>();
-        for (String text : texts) {
+        for (int textIdx = 0; textIdx < texts.size(); textIdx++) {
+            String text = texts.get(textIdx);
             List<String> chunks = chunk(text);
+
+            System.out.println("=== TextChunker 切分文档 " + (textIdx + 1) + " ===");
+            System.out.println("原始长度: " + text.length() + " 字符");
+            System.out.println("切分策略: chunkSize=" + chunkSize + ", overlap=" + overlap);
+            System.out.println("切分块数: " + chunks.size());
+
             for (int i = 0; i < chunks.size(); i++) {
+                int charStart = i * (chunkSize - overlap);
+                int charEnd = Math.min(charStart + chunkSize, text.length());
+                String charRange = charStart + "-" + charEnd;
+
+                System.out.printf("  Chunk[%d]: 字符范围 [%d-%d], 长度 %d 字符%n",
+                        i, charStart, charEnd, chunks.get(i).length());
+                System.out.println("  内容预览: " + chunks.get(i).substring(0, Math.min(80, chunks.get(i).length())) + "...");
+
                 org.springframework.ai.document.Document doc = new org.springframework.ai.document.Document(chunks.get(i));
                 doc.getMetadata().put("chunkIndex", i);
                 doc.getMetadata().put("chunkTotal", chunks.size());
+                doc.getMetadata().put("charRange", charRange);
                 doc.getMetadata().put("sourceText", text.length() > 50 ? text.substring(0, 50) + "..." : text);
                 documents.add(doc);
             }
+            System.out.println();
         }
         return documents;
     }

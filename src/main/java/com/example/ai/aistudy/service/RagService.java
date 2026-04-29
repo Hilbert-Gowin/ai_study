@@ -9,7 +9,10 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class RagService {
@@ -133,5 +136,38 @@ public class RagService {
                 .user(prompt)
                 .call()
                 .content();
+    }
+
+    /**
+     * 验证模式：返回检索详情，不经过LLM，用于诊断检索是否正确
+     */
+    public List<Map<String, Object>> verifyRetrieval(String query, int topK) {
+        List<Document> documents = vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(query)
+                        .topK(topK)
+                        .similarityThreshold(0.3f)
+                        .build()
+        );
+
+        return documents.stream()
+                .map(doc -> {
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("text", doc.getText());
+                    result.put("chunkIndex", doc.getMetadata().get("chunkIndex"));
+                    result.put("chunkTotal", doc.getMetadata().get("chunkTotal"));
+                    result.put("charRange", doc.getMetadata().get("charRange"));
+                    result.put("sourceText", doc.getMetadata().get("sourceText"));
+
+                    Object distance = doc.getMetadata().get("distance");
+                    if (distance != null) {
+                        double dist = ((Number) distance).doubleValue();
+                        result.put("distance", dist);
+                        result.put("score", 1.0 - dist);
+                    }
+
+                    return result;
+                })
+                .collect(Collectors.toList());
     }
 }
