@@ -1,5 +1,6 @@
 package com.example.ai.aistudy.controller;
 
+import com.example.ai.aistudy.model.RagVerifyResponse;
 import com.example.ai.aistudy.service.RagService;
 import org.springframework.ai.document.Document;
 import org.springframework.web.bind.annotation.*;
@@ -49,5 +50,22 @@ public class RagController {
         String question = request.get("question");
         String answer = ragService.ragAsk(question);
         return Map.of("question", question, "answer", answer);
+    }
+
+    /**
+     * RAG 校验：完整展示两阶段检索流程
+     * GET /api/rag/verify?query=xxx&topK=3
+     *
+     * 返回内容：
+     * - query: 查询内容
+     * - rerankEnabled: 是否启用了 rerank
+     * - coarseResults: 初筛结果（向量检索召回的候选）
+     * - finalResults: 重排后的最终结果
+     * - rerankDetails: 每条候选的详细评分（仅 rerank 开启时有）
+     */
+    @GetMapping("/verify")
+    public RagVerifyResponse verify(@RequestParam String query,
+                                    @RequestParam(defaultValue = "3") int topK) {
+        return ragService.verifyRetrievalFull(query, topK);
     }
 }

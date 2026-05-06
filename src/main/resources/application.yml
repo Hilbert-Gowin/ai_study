@@ -33,6 +33,17 @@ spring:
         # embedding 实现类型: local=本地模拟, zhipu=智谱API，百练=dashscope
         type: ${SPRING_AI_EMBEDDING_TYPE:dashscope}
 
+  # RAG Rerank 配置
+  rag:
+    rerank:
+      enabled: true
+      initial-top-k: 10
+      final-top-k: 3
+      vector-weight: 0.4
+      keyword-weight: 0.3
+      exact-match-weight: 0.2
+      length-weight: 0.1
+
 management:
   endpoints:
     web:

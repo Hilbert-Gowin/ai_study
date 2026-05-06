@@ -1,7 +1,9 @@
 package com.example.ai.aistudy.service;
 
 import com.example.ai.aistudy.chunk.SimpleTextChunker;
+import com.example.ai.aistudy.config.RerankConfig;
 import com.example.ai.aistudy.model.*;
+import com.example.ai.aistudy.rerank.RerankService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -19,23 +21,26 @@ public class FaqService {
     private final ChatClient chatClient;
     private final EmbeddingModel embeddingModel;
     private final SimpleTextChunker textChunker;
+    private final RerankService rerankService;
+    private final RerankConfig rerankConfig;
 
     public FaqService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder,
-                      EmbeddingModel embeddingModel, SimpleTextChunker textChunker) {
+                      EmbeddingModel embeddingModel, SimpleTextChunker textChunker,
+                      RerankService rerankService, RerankConfig rerankConfig) {
         this.vectorStore = vectorStore;
         this.chatClient = chatClientBuilder.build();
         this.embeddingModel = embeddingModel;
         this.textChunker = textChunker;
+        this.rerankService = rerankService;
+        this.rerankConfig = rerankConfig;
     }
 
     /**
      * 添加FAQ到向量库
      */
     public FaqAddResponse addFaq(String question, String answer) {
-        // 合并 question 和 answer 作为文档内容
         String content = "问题: " + question + "\n答案: " + answer;
 
-        // 打印 embedding 信息
         float[] embedding = embeddingModel.embed(question);
         System.out.println("=== FAQ 添加 ===");
         System.out.println("问题: " + question);
@@ -43,10 +48,8 @@ public class FaqService {
         System.out.println("Embedding (前5维): " + Arrays.toString(Arrays.copyOfRange(embedding, 0, Math.min(5, embedding.length))));
         System.out.println();
 
-        // 切分文档（会打印切分日志）
         List<Document> documents = textChunker.chunkToDocuments(List.of(content));
 
-        // 返回切分信息
         List<ChunkInfo> chunkInfos = new ArrayList<>();
         for (int i = 0; i < documents.size(); i++) {
             Document doc = documents.get(i);
@@ -57,9 +60,7 @@ public class FaqService {
             ));
         }
 
-        // 存入向量库
         vectorStore.add(documents);
-
         return new FaqAddResponse(true, "FAQ添加成功，共切分 " + documents.size() + " 个chunk", chunkInfos);
     }
 
@@ -67,21 +68,30 @@ public class FaqService {
      * FAQ问答，返回答案和来源
      */
     public FaqAskResponse askFaq(String question) {
-        // 1. 检索相关文档
-        List<Document> documents = vectorStore.similaritySearch(
-                SearchRequest.builder()
-                        .query(question)
-                        .topK(3)
-                        .similarityThreshold(0.5f)
-                        .build()
-        );
+        List<Document> documents;
+        if (rerankConfig.isEnabled()) {
+            List<Document> coarse = vectorStore.similaritySearch(
+                    SearchRequest.builder()
+                            .query(question)
+                            .topK(rerankConfig.getInitialTopK())
+                            .similarityThreshold(0.3f)
+                            .build()
+            );
+            documents = rerankService.rerank(question, coarse, rerankConfig.getFinalTopK());
+        } else {
+            documents = vectorStore.similaritySearch(
+                    SearchRequest.builder()
+                            .query(question)
+                            .topK(3)
+                            .similarityThreshold(0.5f)
+                            .build()
+            );
+        }
 
-        // 2. 拼接上下文
         String context = documents.stream()
                 .map(Document::getText)
                 .reduce("", (a, b) -> a + "\n---\n" + b);
 
-        // 3. 构建来源列表
         List<ChunkSource> sources = documents.stream()
                 .map(doc -> {
                     double score = getSimilarityScore(doc);
@@ -94,12 +104,10 @@ public class FaqService {
                 })
                 .collect(Collectors.toList());
 
-        // 4. 如果没有检索到文档
         if (documents.isEmpty()) {
             return new FaqAskResponse("根据现有文档无法确定答案，请查阅原始资料", List.of());
         }
 
-        // 5. 带上下文提问
         String prompt = """
                 你是一个FAQ问答助手。请根据【参考文档】回答用户的问题。
 
@@ -128,13 +136,25 @@ public class FaqService {
      * 验证模式：只返回检索结果，不经过LLM
      */
     public VerifyResponse verifyRetrieval(String query, int topK) {
-        List<Document> documents = vectorStore.similaritySearch(
-                SearchRequest.builder()
-                        .query(query)
-                        .topK(topK)
-                        .similarityThreshold(0.3f)
-                        .build()
-        );
+        List<Document> documents;
+        if (rerankConfig.isEnabled()) {
+            List<Document> coarse = vectorStore.similaritySearch(
+                    SearchRequest.builder()
+                            .query(query)
+                            .topK(rerankConfig.getInitialTopK())
+                            .similarityThreshold(0.3f)
+                            .build()
+            );
+            documents = rerankService.rerank(query, coarse, topK);
+        } else {
+            documents = vectorStore.similaritySearch(
+                    SearchRequest.builder()
+                            .query(query)
+                            .topK(topK)
+                            .similarityThreshold(0.3f)
+                            .build()
+            );
+        }
 
         List<ChunkSource> retrievals = documents.stream()
                 .map(doc -> {
@@ -161,14 +181,11 @@ public class FaqService {
         return new VerifyResponse(query, retrievals);
     }
 
-    /**
-     * 计算文档的相似度分数（从metadata估算）
-     */
     private double getSimilarityScore(Document doc) {
         Object distance = doc.getMetadata().get("distance");
         if (distance != null) {
             return 1.0 - ((Number) distance).doubleValue();
         }
-        return 0.5; // 默认分数
+        return 0.5;
     }
 }
