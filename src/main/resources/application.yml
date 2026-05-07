@@ -6,6 +6,10 @@ spring:
     allow-bean-definition-overriding: true
   application:
     name: ai-study
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
 
   # 模型提供商选择: dashscope / openai
   # 通过环境变量 SPRING_AI_MODEL 切换

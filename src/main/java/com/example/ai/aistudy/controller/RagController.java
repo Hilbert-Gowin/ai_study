@@ -1,10 +1,13 @@
 package com.example.ai.aistudy.controller;
 
 import com.example.ai.aistudy.model.RagVerifyResponse;
+import com.example.ai.aistudy.parser.DocumentParser;
 import com.example.ai.aistudy.service.RagService;
 import org.springframework.ai.document.Document;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -13,9 +16,11 @@ import java.util.Map;
 public class RagController {
 
     private final RagService ragService;
+    private final DocumentParser documentParser;
 
-    public RagController(RagService ragService) {
+    public RagController(RagService ragService, DocumentParser documentParser) {
         this.ragService = ragService;
+        this.documentParser = documentParser;
     }
 
     /**
@@ -28,6 +33,32 @@ public class RagController {
         List<String> texts = request.get("texts");
         ragService.addDocuments(texts);
         return Map.of("message", "成功添加 " + texts.size() + " 条文档");
+    }
+
+    /**
+     * 上传文件（自动解析文本）
+     * POST /api/rag/upload
+     * 支持：PDF, DOCX, TXT, HTML 等
+     */
+    @PostMapping("/upload")
+    public Map<String, Object> uploadDocument(@RequestParam("file") MultipartFile file) {
+        try {
+            String filename = file.getOriginalFilename();
+            String contentType = documentParser.detectContentType(file);
+            String text = documentParser.parse(file);
+            ragService.addDocuments(List.of(text));
+            System.out.println("上传成功: " + filename + ", 类型: " + contentType + ", 文本长度: " + text.length());
+            Map<String, Object> result = new java.util.HashMap<>();
+            result.put("message", "上传成功");
+            result.put("filename", filename != null ? filename : "未知");
+            result.put("contentType", contentType);
+            result.put("textLength", text.length());
+            return result;
+        } catch (Exception e) {
+            System.out.println("上传失败: " + e.getClass().getName() + ": " + e.getMessage());
+            e.printStackTrace();
+            return Map.of("message", "解析失败: " + e.getMessage());
+        }
     }
 
     /**
