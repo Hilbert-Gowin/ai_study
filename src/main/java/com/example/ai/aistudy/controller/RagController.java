@@ -68,4 +68,21 @@ public class RagController {
                                     @RequestParam(defaultValue = "3") int topK) {
         return ragService.verifyRetrievalFull(query, topK);
     }
+
+    /**
+     * 初始化测试文档
+     * POST /api/rag/init
+     */
+    @PostMapping("/init")
+    public Map<String, Object> initDocuments() {
+        List<String> testDocs = List.of(
+            "Spring AI 是 Spring 官方推出的 AI 框架，旨在简化 AI 应用的开发。它提供了与各种 AI 模型交互的统一抽象，包括 OpenAI、Azure OpenAI、Anthropic、HuggingFace 等。",
+            "EmbeddingModel 是 Spring AI 中的核心接口之一，用于将文本转换为向量表示。它支持多种嵌入模型，如 OpenAIEmbeddingModel、MinimalEmbeddingModel 等。",
+            "VectorStore 是 Spring AI 中的向量存储接口，用于存储和检索向量。它支持多种向量数据库，如 Milvus、Chroma、PgVector 等，也支持内存存储 SimpleVectorStore。",
+            "RerankService 是用于对检索结果进行重排的服务。它结合向量相似度、关键词匹配、精确匹配奖励等因素对候选文档进行排序，提高最终结果的相关性。",
+            "ChatClient 是 Spring AI 提供的对话客户端，支持流式输出和非流式输出。它可以与各种 AI 模型集成，提供统一的对话接口。"
+        );
+        ragService.addDocuments(testDocs);
+        return Map.of("message", "成功加载 " + testDocs.size() + " 条测试文档", "count", testDocs.size());
+    }
 }

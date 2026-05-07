@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Prompt 工作台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+            color: #e0e0e0;
+        }
+
+        /* 顶部工具栏 */
+        .toolbar {
+            padding: 16px 24px;
+            background: #252525;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar h1 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #fff;
+            margin-right: 16px;
+        }
+
+        .toolbar input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 16px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .toolbar input:focus { border-color: #4a9eff; }
+
+        .toolbar-btn {
+            padding: 10px 20px;
+            background: #4a9eff;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .toolbar-btn:hover { background: #3a8eef; }
+        .toolbar-btn:disabled { background: #3a3a3a; cursor: not-allowed; }
+        .toolbar-btn.secondary { background: #4a4a4a; }
+        .toolbar-btn.secondary:hover { background: #5a5a5a; }
+
+        /* 进度指示器 */
+        .steps-indicator {
+            padding: 12px 24px;
+            background: #252525;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #2a2a2a;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .step.active { background: #4a9eff; color: #fff; }
+        .step.completed { background: #2d5a2d; color: #8f8; }
+        .step.disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .step-arrow { color: #555; }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 三栏面板 */
+        .panel {
+            padding: 16px;
+            overflow-y: auto;
+            border-right: 1px solid #333;
+        }
+
+        .panel:last-child { border-right: none; }
+
+        .panel-header {
+            font-size: 14px;
+            font-weight: 500;
+            color: #888;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        /* Chunks 面板 */
+        .chunks-panel {
+            width: 280px;
+            background: #1a1a1a;
+        }
+
+        /* 模板面板 */
+        .template-panel {
+            width: 300px;
+            background: #1a1a1a;
+        }
+
+        /* 预览/日志面板 */
+        .preview-panel {
+            flex: 1;
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Chunk 项 */
+        .chunk-item {
+            padding: 12px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .chunk-item:hover { background: #333; }
+        .chunk-item.selected { border-color: #4a9eff; background: #2a3a4a; }
+
+        .chunk-score {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .chunk-text {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #ccc;
+        }
+
+        /* 模板选项 */
+        .template-option {
+            padding: 12px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .template-option:hover { background: #333; }
+        .template-option.selected { border-color: #4a9eff; background: #2a3a4a; }
+
+        .template-name { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .template-desc { font-size: 12px; color: #888; }
+
+        /* 自定义模板 */
+        .custom-template {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .custom-template.visible { display: block; }
+
+        .custom-template textarea {
+            width: 100%;
+            height: 200px;
+            padding: 12px;
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            resize: vertical;
+            outline: none;
+        }
+
+        .custom-template textarea:focus { border-color: #4a9eff; }
+
+        .template-hint {
+            font-size: 11px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        /* 预览区 */
+        .preview-area {
+            flex: none;
+            display: flex;
+            flex-direction: column;
+            max-height: 300px;
+            margin-bottom: 16px;
+        }
+
+        .preview-box {
+            flex: 1;
+            padding: 16px;
+            background: #111;
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            overflow-y: auto;
+            min-height: 80px;
+        }
+
+        .send-area {
+            flex: none;
+            display: flex;
+            gap: 12px;
+            padding-top: 8px;
+        }
+
+        .send-area select {
+            padding: 10px 16px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .send-area select:focus { border-color: #4a9eff; }
+
+        /* 日志区 */
+        .log-area {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 13px;
+            min-height: 200px;
+        }
+
+        .log-section {
+            margin-bottom: 16px;
+        }
+
+        .log-header {
+            font-weight: 500;
+            padding: 8px 12px;
+            background: #2a2a2a;
+            border-radius: 6px 6px 0 0;
+            color: #4a9eff;
+        }
+
+        .log-content {
+            background: #111;
+            padding: 12px;
+            border-radius: 0 0 6px 6px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-content.error { color: #ff6b6b; }
+        .log-content.success { color: #8f8; }
+
+        /* 空状态 */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            text-align: center;
+        }
+
+        .empty-state h3 { font-size: 16px; margin-bottom: 8px; color: #888; }
+        .empty-state p { font-size: 13px; }
+
+        /* 选中 chunks 统计 */
+        .selection-info {
+            padding: 8px 12px;
+            background: #2a3a4a;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #4a9eff;
+            margin-bottom: 12px;
+        }
+
+        /* AI 响应区域 */
+        .response-area {
+            margin-top: 16px;
+            padding: 16px;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+
+        .response-header {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .response-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
+    </style>
+</head>
+<body>
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+        <h1>RAG Prompt 工作台</h1>
+        <input type="text" id="queryInput" placeholder="输入查询问题..." onkeydown="if(event.key==='Enter')search()">
+        <button class="toolbar-btn" id="searchBtn" onclick="search()">检索</button>
+        <button class="toolbar-btn secondary" id="initBtn" onclick="initDocs()">初始化数据</button>
+        <button class="toolbar-btn secondary" onclick="window.open('/chat.html', '_self')">返回聊天</button>
+    </div>
+
+    <!-- 进度指示器 -->
+    <div class="steps-indicator">
+        <div class="step active" id="step1" onclick="goToStep(1)">1. 检索</div>
+        <span class="step-arrow">→</span>
+        <div class="step disabled" id="step2" onclick="goToStep(2)">2. 选Chunks</div>
+        <span class="step-arrow">→</span>
+        <div class="step disabled" id="step3" onclick="goToStep(3)">3. 模板</div>
+        <span class="step-arrow">→</span>
+        <div class="step disabled" id="step4" onclick="goToStep(4)">4. 发送</div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <!-- Chunks 面板 -->
+        <div class="panel chunks-panel">
+            <div class="panel-header">检索结果</div>
+            <div class="selection-info" id="selectionInfo" style="display:none"></div>
+            <div id="chunksContainer">
+                <div class="empty-state">
+                    <h3>暂无检索结果</h3>
+                    <p>输入问题并点击「检索」开始</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模板面板 -->
+        <div class="panel template-panel">
+            <div class="panel-header">Prompt 模板</div>
+            <div id="templateOptions">
+                <div class="template-option selected" data-template="strict" onclick="selectTemplate('strict')">
+                    <div class="template-name">严谨模式</div>
+                    <div class="template-desc">严格基于文档，禁止推测，要求引用来源</div>
+                </div>
+                <div class="template-option" data-template="loose" onclick="selectTemplate('loose')">
+                    <div class="template-name">宽松模式</div>
+                    <div class="template-desc">允许基于文档内容合理推断</div>
+                </div>
+                <div class="template-option" data-template="cite" onclick="selectTemplate('cite')">
+                    <div class="template-name">引用来源模式</div>
+                    <div class="template-desc">要求在回答中标注来源</div>
+                </div>
+                <div class="template-option" data-template="summary" onclick="selectTemplate('summary')">
+                    <div class="template-name">摘要模式</div>
+                    <div class="template-desc">要求精简概括文档内容</div>
+                </div>
+                <div class="template-option" data-template="custom" onclick="selectTemplate('custom')">
+                    <div class="template-name">自定义模板</div>
+                    <div class="template-desc">自己编写 Prompt 模板</div>
+                </div>
+            </div>
+            <div class="custom-template" id="customTemplateArea">
+                <textarea id="customTemplateInput" placeholder="输入自定义模板，使用 {context} 和 {question} 占位符">
+你是一个严谨的问答助手。请严格基于以下【参考文档】回答用户的问题。
+
+规则：
+- 只使用参考文档中明确提及的信息作答；
+- 如果参考文档中信息不足，直接回答"根据现有文档无法确定"；
+- 禁止推测或补充文档中未提及的内容；
+- 引用来源时，指明是第几段内容。
+
+【参考文档】
+{context}
+
+【用户问题】
+{question}</textarea>
+                <div class="template-hint">可用占位符: {context} = 选中的 chunks, {question} = 用户问题</div>
+            </div>
+        </div>
+
+        <!-- 预览/发送/日志面板 -->
+        <div class="panel preview-panel">
+            <div class="panel-header">Prompt 预览 &amp; 发送</div>
+            <div class="preview-area">
+                <div class="preview-box" id="promptPreview">
+                    <span style="color:#666">请先进行检索和选择模板...</span>
+                </div>
+                <div class="send-area">
+                    <button class="toolbar-btn" id="sendBtn" onclick="sendPrompt()" disabled>发送</button>
+                </div>
+            </div>
+
+            <div class="panel-header" style="margin-top:16px">三联日志</div>
+            <div class="log-area" id="logArea">
+                <div class="empty-state">
+                    <p>发送后将显示检索结果、Prompt 和 AI 回复的对照日志</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        // 状态
+        let currentStep = 1;
+        let chunks = [];
+        let selectedChunks = new Set();
+        let currentTemplate = 'strict';
+        let currentQuery = '';
+        let isStreaming = false;
+
+        // 预设模板
+        const templates = {
+            strict: `你是一个严谨的问答助手。请严格基于以下【参考文档】回答用户的问题。
+
+规则：
+- 只使用参考文档中明确提及的信息作答；
+- 如果参考文档中信息不足，直接回答"根据现有文档无法确定，建议查阅原始资料"；
+- 禁止推测或补充文档中未提及的内容；
+- 引用来源时，指明是第几段内容。
+
+【参考文档】
+{context}
+
+【用户问题】
+{question}`,
+            loose: `你是一个友好的问答助手。请基于以下【参考文档】回答用户的问题。
+
+规则：
+- 优先使用参考文档中的信息；
+- 如果文档信息不足，可以结合常识合理推断，但需说明"根据文档信息推断"；
+- 回答要清晰、准确、易懂。
+
+【参考文档】
+{context}
+
+【用户问题】
+{question}`,
+            cite: `你是一个严谨的问答助手。请严格基于以下【参考文档】回答用户的问题，并准确标注每个回答点的来源。
+
+【参考文档】
+{context}
+
+【用户问题】
+{question}
+
+请在回答中明确标注每个观点的来源，使用"【来源X】"格式。`,
+            summary: `你是一个专业的摘要助手。请仔细阅读以下【参考文档】，然后用简洁的语言概括其核心内容。
+
+【参考文档】
+{context}
+
+【用户问题】
+{question}
+
+请用一段话概括文档内容，不展开细节，突出重点。`
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStepUI();
+        });
+
+        // 步骤切换
+        function goToStep(step) {
+            if (step < currentStep) {
+                currentStep = step;
+                updateStepUI();
+            }
+        }
+
+        function updateStepUI() {
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById('step' + i);
+                el.classList.remove('active', 'completed', 'disabled');
+                if (i === currentStep) {
+                    el.classList.add('active');
+                } else if (i < currentStep) {
+                    el.classList.add('completed');
+                } else {
+                    el.classList.add('disabled');
+                }
+            }
+        }
+
+        // 初始化数据
+        async function initDocs() {
+            const btn = document.getElementById('initBtn');
+            btn.disabled = true;
+            btn.textContent = '初始化中...';
+
+            try {
+                const res = await fetch(`${API_BASE}/rag/init`, { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || '初始化成功');
+            } catch (e) {
+                alert('初始化失败: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '初始化数据';
+            }
+        }
+
+        // 检索
+        async function search() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                alert('请输入查询问题');
+                return;
+            }
+
+            currentQuery = query;
+            const btn = document.getElementById('searchBtn');
+            btn.disabled = true;
+            btn.textContent = '检索中...';
+
+            try {
+                const res = await fetch(`${API_BASE}/rag/verify?query=${encodeURIComponent(query)}&topK=5`);
+                const data = await res.json();
+
+                chunks = data.finalResults || [];
+                selectedChunks.clear();
+                renderChunks();
+
+                if (chunks.length > 0) {
+                    currentStep = 2;
+                    updateStepUI();
+                }
+            } catch (e) {
+                alert('检索失败: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '检索';
+            }
+        }
+
+        // 渲染 chunks
+        function renderChunks() {
+            const container = document.getElementById('chunksContainer');
+
+            if (chunks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>未找到相关结果</h3>
+                        <p>尝试调整查询词或初始化数据</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = chunks.map((chunk, idx) => `
+                <div class="chunk-item ${selectedChunks.has(idx) ? 'selected' : ''}" onclick="toggleChunk(${idx})">
+                    <div class="chunk-score">Chunk ${idx + 1} | Score: ${(chunk.score || 0).toFixed(3)}</div>
+                    <div class="chunk-text">${escapeHtml(chunk.text || chunk.preview || '')}</div>
+                </div>
+            `).join('');
+
+            updateSelectionInfo();
+        }
+
+        function toggleChunk(idx) {
+            if (selectedChunks.has(idx)) {
+                selectedChunks.delete(idx);
+            } else {
+                selectedChunks.add(idx);
+            }
+            renderChunks();
+            updatePromptPreview();
+        }
+
+        function updateSelectionInfo() {
+            const info = document.getElementById('selectionInfo');
+            if (chunks.length > 0) {
+                info.style.display = 'block';
+                info.textContent = `已选择 ${selectedChunks.size} / ${chunks.length} 个 chunks`;
+            } else {
+                info.style.display = 'none';
+            }
+        }
+
+        // 模板选择
+        function selectTemplate(template) {
+            currentTemplate = template;
+            document.querySelectorAll('.template-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.template === template);
+            });
+            document.getElementById('customTemplateArea').classList.toggle('visible', template === 'custom');
+            updatePromptPreview();
+
+            if (chunks.length > 0 && selectedChunks.size > 0) {
+                currentStep = 3;
+                updateStepUI();
+            }
+        }
+
+        // 更新 Prompt 预览
+        function updatePromptPreview() {
+            const preview = document.getElementById('promptPreview');
+            const sendBtn = document.getElementById('sendBtn');
+
+            if (selectedChunks.size === 0) {
+                preview.innerHTML = '<span style="color:#666">请选择要使用的 chunks...</span>';
+                sendBtn.disabled = true;
+                return;
+            }
+
+            let template = currentTemplate === 'custom'
+                ? document.getElementById('customTemplateInput').value
+                : templates[currentTemplate];
+
+            const context = Array.from(selectedChunks).map(idx => {
+                const chunk = chunks[idx];
+                return `[Chunk ${idx + 1}]\n${chunk.text || chunk.preview || ''}`;
+            }).join('\n\n');
+
+            const prompt = template.replace('{context}', context).replace('{question}', currentQuery);
+
+            preview.textContent = prompt;
+            sendBtn.disabled = false;
+        }
+
+        // 发送 Prompt
+        async function sendPrompt() {
+            if (selectedChunks.size === 0 || isStreaming) return;
+
+            let template = currentTemplate === 'custom'
+                ? document.getElementById('customTemplateInput').value
+                : templates[currentTemplate];
+
+            const context = Array.from(selectedChunks).map(idx => {
+                const chunk = chunks[idx];
+                return `[Chunk ${idx + 1}]\n${chunk.text || chunk.preview || ''}`;
+            }).join('\n\n');
+
+            const prompt = template.replace('{context}', context).replace('{question}', currentQuery);
+
+            currentStep = 4;
+            updateStepUI();
+
+            const logArea = document.getElementById('logArea');
+            logArea.innerHTML = '';
+
+            // 渲染检索结果日志
+            const chunksLog = document.createElement('div');
+            chunksLog.className = 'log-section';
+            chunksLog.innerHTML = `
+                <div class="log-header">[步骤1 - 检索结果]</div>
+                <div class="log-content">${chunks.map((c, i) =>
+                    `• Chunk ${i + 1} (score: ${(c.score || 0).toFixed(3)}): "${escapeHtml((c.text || c.preview || '').substring(0, 80))}..."`
+                ).join('\n')}</div>`;
+            logArea.appendChild(chunksLog);
+
+            // 渲染选中的 Chunks
+            const selectedLog = document.createElement('div');
+            selectedLog.className = 'log-section';
+            selectedLog.innerHTML = `
+                <div class="log-header">[步骤2 - 选中的 Chunks]</div>
+                <div class="log-content">${Array.from(selectedChunks).map(idx => {
+                    const c = chunks[idx];
+                    return `[Chunk ${idx + 1}]\n${c.text || c.preview || ''}`;
+                }).join('\n\n')}</div>`;
+            logArea.appendChild(selectedLog);
+
+            // 渲染最终 Prompt
+            const promptLog = document.createElement('div');
+            promptLog.className = 'log-section';
+            promptLog.innerHTML = `
+                <div class="log-header">[步骤3 - 最终 Prompt]</div>
+                <div class="log-content">${escapeHtml(prompt)}</div>`;
+            logArea.appendChild(promptLog);
+
+            // 渲染 AI 回复
+            const responseLog = document.createElement('div');
+            responseLog.className = 'log-section';
+            responseLog.innerHTML = `
+                <div class="log-header">[步骤4 - AI 回复]</div>
+                <div class="log-content" id="responseContent">等待回复...</div>`;
+            logArea.appendChild(responseLog);
+
+            logArea.scrollTop = logArea.scrollHeight;
+
+            // 发送请求
+            isStreaming = true;
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/chat/stream`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: prompt })
+                });
+
+                if (!res.ok) throw new Error('请求失败');
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    fullResponse += decoder.decode(value);
+                    document.getElementById('responseContent').textContent = fullResponse;
+                    logArea.scrollTop = logArea.scrollHeight;
+                }
+            } catch (e) {
+                document.getElementById('responseContent').textContent = '错误: ' + e.message;
+                document.getElementById('responseContent').className = 'log-content error';
+            } finally {
+                isStreaming = false;
+                sendBtn.disabled = false;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
