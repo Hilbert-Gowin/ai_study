@@ -46,7 +46,7 @@ public class RagController {
             String filename = file.getOriginalFilename();
             String contentType = documentParser.detectContentType(file);
             String text = documentParser.parse(file);
-            ragService.addDocuments(List.of(text));
+            ragService.addDocumentsWithPersistence(List.of(text), filename, contentType);
             System.out.println("上传成功: " + filename + ", 类型: " + contentType + ", 文本长度: " + text.length());
             Map<String, Object> result = new java.util.HashMap<>();
             result.put("message", "上传成功");

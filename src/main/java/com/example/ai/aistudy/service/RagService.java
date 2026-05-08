@@ -4,11 +4,17 @@ import com.example.ai.aistudy.chunk.SimpleTextChunker;
 import com.example.ai.aistudy.config.BigModelConfig.InMemoryEmbeddingModel;
 import com.example.ai.aistudy.config.RerankConfig;
 import com.example.ai.aistudy.model.ChunkSource;
+import com.example.ai.aistudy.model.DocumentRecord;
 import com.example.ai.aistudy.model.RagVerifyResponse;
 import com.example.ai.aistudy.model.RerankDetail;
+import com.example.ai.aistudy.repository.DocumentRepository;
 import com.example.ai.aistudy.rerank.RerankScore;
 import com.example.ai.aistudy.rerank.RerankService;
 import com.example.ai.aistudy.rerank.RerankService.RerankResult;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -28,16 +34,33 @@ public class RagService {
     private final SimpleTextChunker textChunker;
     private final RerankService rerankService;
     private final RerankConfig rerankConfig;
+    private final DocumentRepository documentRepository;
+    private final ObjectMapper objectMapper;
 
     public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder,
                       EmbeddingModel embeddingModel, SimpleTextChunker textChunker,
-                      RerankService rerankService, RerankConfig rerankConfig) {
+                      RerankService rerankService, RerankConfig rerankConfig,
+                      DocumentRepository documentRepository) {
         this.vectorStore = vectorStore;
         this.chatClient = chatClientBuilder.build();
         this.embeddingModel = embeddingModel;
         this.textChunker = textChunker;
         this.rerankService = rerankService;
         this.rerankConfig = rerankConfig;
+        this.documentRepository = documentRepository;
+        this.objectMapper = new ObjectMapper();
+    }
+
+    @PostConstruct
+    public void reloadFromDatabase() {
+        List<String> chunks = documentRepository.getAllChunks();
+        if (!chunks.isEmpty()) {
+            System.out.println("[RagService] 启动恢复：从数据库加载 " + chunks.size() + " 个 chunks");
+            addDocumentsToVectorStore(chunks);
+            System.out.println("[RagService] 启动恢复完成，向量库当前 chunk 数约 " + chunks.size());
+        } else {
+            System.out.println("[RagService] 启动恢复：数据库无记录，从空白开始");
+        }
     }
 
     public void addDocuments(List<String> texts) {
@@ -74,6 +97,49 @@ public class RagService {
         System.out.println("Chunk 策略: " + textChunker.getDescription());
         System.out.println();
 
+        vectorStore.add(documents);
+    }
+
+    /**
+     * 上传文档时调用：持久化到 SQLite 并添加到向量库
+     */
+    public void addDocumentsWithPersistence(List<String> texts, String filename, String contentType) {
+        // 生成 Document 对象（包含 metadata，chunk 已限制在 500 字符以内）
+        List<Document> documents = textChunker.chunkToDocuments(texts);
+        System.out.println("=== Chunking 结果 ===");
+        System.out.println("原始文档数: " + texts.size());
+        System.out.println("切分后 Chunk 数: " + documents.size());
+        System.out.println("Chunk 策略: " + textChunker.getDescription());
+        System.out.println();
+
+        // 添加到向量库
+        vectorStore.add(documents);
+
+        // 持久化到 SQLite：从 Document 对象提取 chunk 文本
+        List<String> allChunks = documents.stream()
+                .map(Document::getText)
+                .toList();
+
+        String originalText = String.join("\n\n--- 文档分隔 ---\n\n", texts);
+        try {
+            String chunksJson = objectMapper.writeValueAsString(allChunks);
+            DocumentRecord record = new DocumentRecord(filename, contentType, originalText, chunksJson, allChunks.size());
+            documentRepository.save(record);
+        } catch (JsonProcessingException e) {
+            System.out.println("[RagService] 序列化 chunks 失败: " + e.getMessage());
+        }
+    }
+
+    private void addDocumentsToVectorStore(List<String> chunks) {
+        List<Document> documents = new ArrayList<>();
+        for (int i = 0; i < chunks.size(); i++) {
+            org.springframework.ai.document.Document doc = new org.springframework.ai.document.Document(chunks.get(i));
+            doc.getMetadata().put("chunkIndex", i);
+            doc.getMetadata().put("chunkTotal", chunks.size());
+            doc.getMetadata().put("charRange", "N/A");
+            doc.getMetadata().put("sourceText", "恢复数据");
+            documents.add(doc);
+        }
         vectorStore.add(documents);
     }
 
