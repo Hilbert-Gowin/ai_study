@@ -1,8 +1,12 @@
 package com.example.ai.aistudy.controller;
 
+import com.example.ai.aistudy.chunk.SimpleTextChunker;
+import com.example.ai.aistudy.model.DocumentRecord;
 import com.example.ai.aistudy.model.RagVerifyResponse;
 import com.example.ai.aistudy.parser.DocumentParser;
+import com.example.ai.aistudy.repository.DocumentRepository;
 import com.example.ai.aistudy.service.RagService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.document.Document;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -10,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/rag")
@@ -17,10 +22,17 @@ public class RagController {
 
     private final RagService ragService;
     private final DocumentParser documentParser;
+    private final DocumentRepository documentRepository;
+    private final SimpleTextChunker textChunker;
+    private final ObjectMapper objectMapper;
 
-    public RagController(RagService ragService, DocumentParser documentParser) {
+    public RagController(RagService ragService, DocumentParser documentParser,
+                         DocumentRepository documentRepository, SimpleTextChunker textChunker) {
         this.ragService = ragService;
         this.documentParser = documentParser;
+        this.documentRepository = documentRepository;
+        this.textChunker = textChunker;
+        this.objectMapper = new ObjectMapper();
     }
 
     /**
@@ -98,6 +110,78 @@ public class RagController {
     public RagVerifyResponse verify(@RequestParam String query,
                                     @RequestParam(defaultValue = "3") int topK) {
         return ragService.verifyRetrievalFull(query, topK);
+    }
+
+    /**
+     * 文档列表
+     * GET /api/rag/documents
+     */
+    @GetMapping("/documents")
+    public List<DocumentRecord> listDocuments() {
+        return documentRepository.findAll();
+    }
+
+    /**
+     * 删除文档
+     * DELETE /api/rag/documents/{id}
+     */
+    @DeleteMapping("/documents/{id}")
+    public Map<String, Object> deleteDocument(@PathVariable Long id) {
+        boolean success = ragService.deleteDocument(id);
+        if (success) {
+            return Map.of("message", "文档删除成功", "id", id);
+        } else {
+            return Map.of("message", "文档不存在或删除失败", "id", id);
+        }
+    }
+
+    /**
+     * 重新解析文档（重新分词并更新向量库）
+     * POST /api/rag/documents/{id}/reparse
+     */
+    @PostMapping("/documents/{id}/reparse")
+    public Map<String, Object> reparseDocument(@PathVariable Long id) {
+        Optional<DocumentRecord> optDoc = documentRepository.findById(id);
+        if (optDoc.isEmpty()) {
+            return Map.of("message", "文档不存在", "id", id);
+        }
+
+        DocumentRecord doc = optDoc.get();
+        try {
+            // 获取原始文本
+            String originalText = doc.getOriginalText();
+            if (originalText == null || originalText.isBlank()) {
+                return Map.of("message", "文档内容为空，无法重新解析", "id", id);
+            }
+
+            // 重新分词（使用和上传时相同的逻辑）
+            List<String> texts = List.of(originalText);
+            List<Document> documents = textChunker.chunkToDocuments(texts);
+
+            // 更新数据库中的 chunks
+            List<String> newChunks = documents.stream()
+                    .map(Document::getText)
+                    .toList();
+
+            doc.setChunks(objectMapper.writeValueAsString(newChunks));
+            doc.setChunkCount(newChunks.size());
+            documentRepository.update(doc);
+
+            // 重建向量库
+            ragService.rebuildVectorStore();
+
+            System.out.println("[RagController] 重新解析文档: " + doc.getFilename() + ", 新 chunk 数: " + newChunks.size());
+            return Map.of(
+                "message", "重新解析成功",
+                "id", id,
+                "filename", doc.getFilename(),
+                "newChunkCount", newChunks.size()
+            );
+        } catch (Exception e) {
+            System.out.println("[RagController] 重新解析失败: " + e.getMessage());
+            e.printStackTrace();
+            return Map.of("message", "重新解析失败: " + e.getMessage());
+        }
     }
 
     /**

@@ -319,6 +319,70 @@ public class RagService {
         return new RagVerifyResponse(query, rerankConfig.isEnabled(), coarseResults, finalResults, rerankDetails);
     }
 
+    /**
+     * 重建向量库：从数据库加载所有文档的 chunks
+     */
+    public void rebuildVectorStore() {
+        List<String> chunks = documentRepository.getAllChunks();
+        // 清空当前向量库（通过重建的方式）
+        clearVectorStore();
+        if (!chunks.isEmpty()) {
+            addDocumentsToVectorStore(chunks);
+        }
+        System.out.println("[RagService] 向量库重建完成，当前 chunk 数: " + chunks.size());
+    }
+
+    /**
+     * 清空向量库中的所有文档
+     */
+    public void clearVectorStore() {
+        // SimpleVectorStore 不提供直接清空方法，通过反射或重建实现
+        // 暂时通过重建空向量库处理
+        try {
+            // 获取 vectorStore 的 documents 字段并清空
+            java.lang.reflect.Field field = vectorStore.getClass().getDeclaredField("documents");
+            field.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            java.util.List<Document> docs = (java.util.List<Document>) field.get(vectorStore);
+            docs.clear();
+            System.out.println("[RagService] 向量库已清空");
+        } catch (Exception e) {
+            System.out.println("[RagService] 清空向量库失败，将尝试重建方式: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除文档：从数据库删除，并从向量库移除对应的 chunks
+     * @param docId 文档 ID
+     * @return 是否成功删除
+     */
+    public boolean deleteDocument(Long docId) {
+        Optional<DocumentRecord> optDoc = documentRepository.findById(docId);
+        if (optDoc.isEmpty()) {
+            System.out.println("[RagService] 文档不存在: id=" + docId);
+            return false;
+        }
+
+        DocumentRecord doc = optDoc.get();
+        // 解析出该文档的 chunks
+        List<String> docChunks;
+        try {
+            docChunks = objectMapper.readValue(doc.getChunks(), new TypeReference<List<String>>() {});
+        } catch (JsonProcessingException e) {
+            System.out.println("[RagService] 解析 chunks 失败: " + e.getMessage());
+            return false;
+        }
+
+        // 从数据库删除
+        documentRepository.deleteById(docId);
+
+        // 重建向量库
+        rebuildVectorStore();
+
+        System.out.println("[RagService] 删除文档: " + doc.getFilename() + ", 移除了 " + docChunks.size() + " 个 chunks");
+        return true;
+    }
+
     private List<ChunkSource> toChunkSources(List<Document> docs) {
         return docs.stream()
                 .map(doc -> {

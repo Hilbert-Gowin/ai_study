@@ -134,6 +134,26 @@ public class DocumentRepository {
         }
     }
 
+    public void update(DocumentRecord doc) {
+        String sql = """
+            UPDATE documents SET filename = ?, content_type = ?, original_text = ?, chunks = ?, chunk_count = ?
+            WHERE id = ?
+            """;
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, doc.getFilename());
+            ps.setString(2, doc.getContentType());
+            ps.setString(3, doc.getOriginalText());
+            ps.setString(4, doc.getChunks());
+            ps.setInt(5, doc.getChunkCount());
+            ps.setLong(6, doc.getId());
+            ps.executeUpdate();
+            System.out.println("[DocumentRepository] 更新文档 id=" + doc.getId() + ", chunks=" + doc.getChunkCount());
+        } catch (SQLException e) {
+            throw new RuntimeException("更新文档失败", e);
+        }
+    }
+
     public List<String> getAllChunks() {
         List<DocumentRecord> docs = findAll();
         List<String> allChunks = new ArrayList<>();
