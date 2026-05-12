@@ -107,24 +107,4 @@ public class ChatService {
     public void deleteConversation(String conversationId) {
         conversations.remove(conversationId);
     }
-
-    /**
-     * 简单对话
-     */
-    public String chat(String message) {
-        return chatClient.prompt()
-                .user(message)
-                .call()
-                .content();
-    }
-
-    /**
-     * 带会话记忆的对话
-     */
-    public String chatWithMemory(String conversationId, String message) {
-        return chatClient.prompt()
-                .user(message)
-                .call()
-                .content();
-    }
 }

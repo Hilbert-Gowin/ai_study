@@ -68,20 +68,4 @@ public class ChatController {
         chatService.deleteConversation(id);
         return Map.of("message", "deleted");
     }
-
-    // 原有接口保留
-    @PostMapping
-    public Map<String, String> chat(@RequestBody Map<String, String> request) {
-        String message = request.get("message");
-        String reply = chatService.chat(message);
-        return Map.of("reply", reply);
-    }
-
-    @PostMapping("/memory")
-    public Map<String, String> chatWithMemory(@RequestBody Map<String, String> request) {
-        String conversationId = request.get("conversationId");
-        String message = request.get("message");
-        String reply = chatService.chatWithMemory(conversationId, message);
-        return Map.of("conversationId", conversationId, "reply", reply);
-    }
 }

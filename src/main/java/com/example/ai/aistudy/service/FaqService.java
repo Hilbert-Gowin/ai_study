@@ -132,55 +132,6 @@ public class FaqService {
         return new FaqAskResponse(answer, sources);
     }
 
-    /**
-     * 验证模式：只返回检索结果，不经过LLM
-     */
-    public VerifyResponse verifyRetrieval(String query, int topK) {
-        List<Document> documents;
-        if (rerankConfig.isEnabled()) {
-            List<Document> coarse = vectorStore.similaritySearch(
-                    SearchRequest.builder()
-                            .query(query)
-                            .topK(rerankConfig.getInitialTopK())
-                            .similarityThreshold(0.3f)
-                            .build()
-            );
-            documents = rerankService.rerank(query, coarse, topK);
-        } else {
-            documents = vectorStore.similaritySearch(
-                    SearchRequest.builder()
-                            .query(query)
-                            .topK(topK)
-                            .similarityThreshold(0.3f)
-                            .build()
-            );
-        }
-
-        List<ChunkSource> retrievals = documents.stream()
-                .map(doc -> {
-                    double score = getSimilarityScore(doc);
-                    return new ChunkSource(
-                            (Integer) doc.getMetadata().getOrDefault("chunkIndex", 0),
-                            doc.getText().substring(0, Math.min(150, doc.getText().length())) + "...",
-                            score,
-                            1.0 - score
-                    );
-                })
-                .collect(Collectors.toList());
-
-        System.out.println("=== Verify 检索结果 ===");
-        System.out.println("查询: " + query);
-        System.out.println("检索到 " + retrievals.size() + " 个chunk:");
-        for (int i = 0; i < retrievals.size(); i++) {
-            ChunkSource cs = retrievals.get(i);
-            System.out.printf("  [%d] score=%.4f, distance=%.4f%n", i, cs.getScore(), cs.getDistance());
-            System.out.println("      " + cs.getText());
-        }
-        System.out.println();
-
-        return new VerifyResponse(query, retrievals);
-    }
-
     private double getSimilarityScore(Document doc) {
         Object distance = doc.getMetadata().get("distance");
         if (distance != null) {

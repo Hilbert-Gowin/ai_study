@@ -33,14 +33,4 @@ public class FaqController {
     public FaqAskResponse askFaq(@RequestBody FaqRequest request) {
         return faqService.askFaq(request.getQuestion());
     }
-
-    /**
-     * 验证模式：返回检索详情
-     * GET /api/faq/verify?query=xxx&topK=3
-     */
-    @GetMapping("/verify")
-    public VerifyResponse verify(@RequestParam String query,
-                                  @RequestParam(defaultValue = "3") int topK) {
-        return faqService.verifyRetrieval(query, topK);
-    }
 }
